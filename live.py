@@ -9,122 +9,122 @@ import cv2  # openCV
 import time
 
 
-def get_stream(url):
+def pegarStream(url):
     """
-    Get upload chunk url
-    input: youtube URL
-    output: m3u8 object segment
+    Recebe como parâmetro uma URL de transmissão ao vivo do youtube e retorna um segmento m3u8
     """
-    # Try this line tries number of times, if it doesn't work,
-    # then show the exception on the last attempt
-    # Credit, theherk, https://stackoverflow.com/questions/2083987/how-to-retry-after-exception
-    tries = 10
-    for i in range(tries):
+
+    tentativas = 10
+    for i in range(tentativas):
         try:
             streams = streamlink.streams(url)
         except:
-            if i < tries - 1:  # i is zero indexed
-                print(f"Attempt {i+1} of {tries}")
-                time.sleep(0.1)  # Wait half a second, avoid overload
+            if i < tentativas - 1:
+                print(f"Tentativa {i+1} de {tentativas}")
+                # Pausa por 1 segundo
+                time.sleep(1)
                 continue
             else:
                 raise
         break
 
-    stream_url = streams["best"]  # Alternate, use '360p'
+    # Seleciona a melhor qualidade
+    stream_url = streams["best"]
 
+    # Cria um objeto M3U8
     m3u8_obj = m3u8.load(stream_url.args['url'])
-    return m3u8_obj.segments[0]  # Parsed stream
+    return m3u8_obj.segments[0]
 
 
 def dl_stream(url, filename, chunks):
     """
-    Download each chunk to file
-    input: url, filename, and number of chunks (int)
-    output: saves file at filename location
-    returns none.
+    Baixa cada segmento do m3u8 e salva em um arquivo
+    Recebe a url da strem, o nome do arquivo e o número de segmentos
     """
     pre_time_stamp = datetime(1, 1, 1, 0, 0, tzinfo=timezone.utc)
-
-    # Repeat for each chunk
-    # Needs to be in chunks because
-    #  1) it's live
-    #  2) it won't let you leave the stream open forever
+    
     i = 1
     while i <= chunks:
 
-        # Open stream
-        stream_segment = get_stream(url)
+        # Abre a stream
+        stream_segment = pegarStream(url)
 
-        # Get current time on video
+        # Pega o tempo atual do video
         cur_time_stamp = stream_segment.program_date_time
-        # Only get next time step, wait if it's not new yet
+
+        # Pega somente o proximo tempo do video, espera se ele ainda nao for novo
         if cur_time_stamp <= pre_time_stamp:
-            # Don't increment counter until we have a new chunk
+
+            # Não incrementa o contador até que tenha um novo segmento
             print("NO   pre: ", pre_time_stamp, "curr:", cur_time_stamp)
-            time.sleep(0.5)  # Wait half a sec
+            time.sleep(1)
             pass
         else:
             print("YES: pre: ", pre_time_stamp, "curr:", cur_time_stamp)
             print(f'#{i} at time {cur_time_stamp}')
-            # Open file for writing stream
-            file = open(filename, 'ab+')  # ab+ means keep adding to file
-            # Write stream to file
+
+            # Abre o arquivo
+            file = open(filename, 'ab+')
+
+            # Escreve a stream no arquivo
             with urllib.request.urlopen(stream_segment.uri) as response:
                 html = response.read()
                 file.write(html)
 
-            # Update time stamp
+            # Atualiza o tempo
             pre_time_stamp = cur_time_stamp
-            time.sleep(stream_segment.duration)  # Wait duration time - 1
+            time.sleep(stream_segment.duration)
 
-            i += 1  # only increment if we got a new chunk
+            # Somente incrementa se tiver um novo segmento
+            i += 1
 
     return None
 
 
-def openCVProcessing(saved_video_file):
-    '''View saved video with openCV
-    Add your other steps here'''
+def processarVideo(arquivo):
+    # Carregar o vídeo
+    video = cv2.VideoCapture(arquivo)
 
-    # capture frames from a video
-    cap = cv2.VideoCapture(saved_video_file)
+    # Importar classificadores treinados para detectar alguns recursos de algum objeto que queremos detectar
+    classificador = cv2.CascadeClassifier('./carros.xml')
 
-    # Trained XML classifiers describes some features of some object we want to detect
-    car_cascade = cv2.CascadeClassifier('cars.xml')
-
-    # loop runs if capturing has been initialized.
+    # Loop infinito enquanto o vídeo estiver aberto
     while True:
-        # reads frames from a video
-        ret, frames = cap.read()
+        # Lê os frames do vídeo
+        ret, frames = video.read()
 
-        # convert to gray scale of each frames
-        gray = cv2.cvtColor(frames, cv2.COLOR_BGR2GRAY)
+        # Converte o frame para escala de cinza
+        cinza = cv2.cvtColor(frames, cv2.COLOR_BGR2GRAY)
 
-        # Detects cars of different sizes in the input image
-        cars, rejectLevels, levelWeigths = car_cascade.detectMultiScale3(
-            gray, 1.1, 1, outputRejectLevels=True)
+        # Detectar carros de diferentes tamanhos no frame de entrada
+        carros, niveisRejeicao, niveisConfianca = classificador.detectMultiScale3(cinza, 1.1, 1, outputRejectLevels=True)
 
+        # Contador de objetos detectados
         i = 0
-        # To draw a rectangle in each cars
-        for (x, y, w, h) in cars:
-            if levelWeigths[i] > 0.9:
+        # Desenhar um retângulo em cada carro
+        for (x, y, w, h) in carros:
+            # Se o nivel de confiaça for maior que 90, então considera como um carro
+            if niveisConfianca[i] > 0.9:
                 cv2.rectangle(frames, (x, y), (x+w, y+h), (0, 0, 255), 2)
-            i += 1
-    # Display frames in a window
-        cv2.imshow('video2', frames)
 
-        # Wait for Esc key to stop
+            i += 1
+
+        # Exibe os frames do vídeo
+        cv2.imshow('Resultado', frames)
+
+        # Se apertar ESC, interrompe o loop
         if cv2.waitKey(1) & 0XFF == 27:
             break
 
-        # De-allocate any associated memory usage
+        # Fecha todas as janelas abertas
     cv2.destroyAllWindows()
 
 
-tempFile = "temp.ts"  # files are format ts, open cv can view them
-videoURL = "https://www.youtube.com/watch?v=5_XSYlAfJZM&ab_channel=BradPhillips"
-# videoURL = "https://www.youtube.com/watch?v=jI6ELKQ9q5E&ab_channel=RustyBryant"
+arquivoTemporario = "temp.ts"  # files are format ts, open cv can view them
+urlTransmissao = "https://www.youtube.com/watch?v=5_XSYlAfJZM&ab_channel=BradPhillips"
+# urlTransmissao = "https://www.youtube.com/watch?v=jI6ELKQ9q5E&ab_channel=RustyBryant"
 
-dl_stream(videoURL, tempFile, 3)
-openCVProcessing(tempFile)
+dl_stream(urlTransmissao, arquivoTemporario, 3)
+processarVideo(arquivoTemporario)
+# processarVideo("./modelo.mp4")
+# processarVideo("./video.avi")
