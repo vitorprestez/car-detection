@@ -42,7 +42,7 @@ def dl_stream(url, filename, chunks):
     Recebe a url da strem, o nome do arquivo e o número de segmentos
     """
     pre_time_stamp = datetime(1, 1, 1, 0, 0, tzinfo=timezone.utc)
-    
+
     i = 1
     while i <= chunks:
 
@@ -97,7 +97,8 @@ def processarVideo(arquivo):
         cinza = cv2.cvtColor(frames, cv2.COLOR_BGR2GRAY)
 
         # Detectar carros de diferentes tamanhos no frame de entrada
-        carros, niveisRejeicao, niveisConfianca = classificador.detectMultiScale3(cinza, 1.1, 1, outputRejectLevels=True)
+        carros, niveisRejeicao, niveisConfianca = classificador.detectMultiScale3(
+            cinza, 1.1, 1, outputRejectLevels=True)
 
         # Contador de objetos detectados
         i = 0
@@ -116,11 +117,11 @@ def processarVideo(arquivo):
         if cv2.waitKey(1) & 0XFF == 27:
             break
 
-        # Fecha todas as janelas abertas
+        # Fecha todas as janelas abertas e limpa a memória usada
     cv2.destroyAllWindows()
 
 
-arquivoTemporario = "temp.ts"  # files are format ts, open cv can view them
+arquivoTemporario = "temp.ts"  # o openCV aceita arquivos .ts
 urlTransmissao = "https://www.youtube.com/watch?v=5_XSYlAfJZM&ab_channel=BradPhillips"
 # urlTransmissao = "https://www.youtube.com/watch?v=jI6ELKQ9q5E&ab_channel=RustyBryant"
 
